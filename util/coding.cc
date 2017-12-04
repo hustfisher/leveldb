@@ -109,6 +109,9 @@ int VarintLength(uint64_t v) {
   return len;
 }
 
+/**
+ * 从p读取varint32，最多读取5字节
+ */
 const char* GetVarint32PtrFallback(const char* p,
                                    const char* limit,
                                    uint32_t* value) {
@@ -128,6 +131,9 @@ const char* GetVarint32PtrFallback(const char* p,
   return NULL;
 }
 
+/**
+ * 从input 读取varint32，放入value，input字串重新移位。
+ */
 bool GetVarint32(Slice* input, uint32_t* value) {
   const char* p = input->data();
   const char* limit = p + input->size();
@@ -140,12 +146,19 @@ bool GetVarint32(Slice* input, uint32_t* value) {
   }
 }
 
+/**
+ * 从p读取最大10字节到value，编码方式：
+ * 每个字节中，第8bit为1，表明本字节不是最高字节，如果第8bit为0，表示本字节是最高字节；
+ * 每个字节中，低7bit存储有效数据信息，每次处理，高位7bit需要左移7*n 位。
+ * 对大部分是小int的场景，特别省字节！google 内使用常见。
+ */
 const char* GetVarint64Ptr(const char* p, const char* limit, uint64_t* value) {
   uint64_t result = 0;
+  // 每次处理一个字节
   for (uint32_t shift = 0; shift <= 63 && p < limit; shift += 7) {
-    uint64_t byte = *(reinterpret_cast<const unsigned char*>(p));
+    uint64_t byte = *(reinterpret_cast<const unsigned char*>(p)); // 先把p转为unsigned char *，然后作为无符号char读出
     p++;
-    if (byte & 128) {
+    if (byte & 128) { //byte 最高位
       // More bytes are present
       result |= ((byte & 127) << shift);
     } else {
@@ -157,6 +170,10 @@ const char* GetVarint64Ptr(const char* p, const char* limit, uint64_t* value) {
   return NULL;
 }
 
+/**
+ * 从input按google varint编码读取一个varint，返回读取结束的下一个位置。
+ * 如果读完所有字节，返回false，否则返回剩余的字符串，并放入input
+ */
 bool GetVarint64(Slice* input, uint64_t* value) {
   const char* p = input->data();
   const char* limit = p + input->size();
@@ -179,6 +196,9 @@ const char* GetLengthPrefixedSlice(const char* p, const char* limit,
   return p + len;
 }
 
+/**
+ * 解析出input的第一个varint32作为length，然后将其后length长度的字串存放到result，并将input继续向后偏移length长度。
+ */
 bool GetLengthPrefixedSlice(Slice* input, Slice* result) {
   uint32_t len;
   if (GetVarint32(input, &len) &&

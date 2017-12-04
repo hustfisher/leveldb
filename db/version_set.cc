@@ -37,6 +37,9 @@ static int64_t ExpandedCompactionByteSizeLimit(const Options* options) {
   return 25 * TargetFileSize(options);
 }
 
+/**
+ * level DB 每个level的最大容量，大致等于：10^(level-1) M
+ */
 static double MaxBytesForLevel(const Options* options, int level) {
   // Note: the result for level zero is not really used since we set
   // the level-0 compaction threshold based on number of files.
@@ -55,6 +58,9 @@ static uint64_t MaxFileSizeForLevel(const Options* options, int level) {
   return TargetFileSize(options);
 }
 
+/**
+ * 计算所有files的size之和
+ */
 static int64_t TotalFileSize(const std::vector<FileMetaData*>& files) {
   int64_t sum = 0;
   for (size_t i = 0; i < files.size(); i++) {
@@ -83,6 +89,9 @@ Version::~Version() {
   }
 }
 
+/**
+ * 从files 找到等于或大于key的file
+ */
 int FindFile(const InternalKeyComparator& icmp,
              const std::vector<FileMetaData*>& files,
              const Slice& key) {
@@ -329,12 +338,18 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key,
   }
 }
 
+/**
+ * 1 先构建查找key；
+ * 2 查找L-0中所有包含key range的files，查找所有其他Level的包含key range的files；
+ * 3 从新到旧，依次查所有files，一旦找到一个则截止；
+ * 4 找key的方式是tableCache找or加载table（file index）到tableCache，然后从tableCache查key index，如果找到则加载data block.
+ */
 Status Version::Get(const ReadOptions& options,
                     const LookupKey& k,
                     std::string* value,
                     GetStats* stats) {
-  Slice ikey = k.internal_key();
-  Slice user_key = k.user_key();
+  Slice ikey = k.internal_key(); //key char[] + sequencenum|type
+  Slice user_key = k.user_key(); // 仅仅key char[]
   const Comparator* ucmp = vset_->icmp_.user_comparator();
   Status s;
 
@@ -528,6 +543,7 @@ int Version::PickLevelForMemTableOutput(
 }
 
 // Store in "*inputs" all files in "level" that overlap [begin,end]
+// 获取某个level中所有key与[begin, end]重叠的files
 void Version::GetOverlappingInputs(
     int level,
     const InternalKey* begin,
@@ -600,9 +616,11 @@ std::string Version::DebugString() const {
 // A helper class so we can efficiently apply a whole sequence
 // of edits to a particular state without creating intermediate
 // Versions that contain full copies of the intermediate state.
+/* 依赖于该辅助类，我们可以有效的将一个完整的编辑序列提供到一个特殊状态，而不用
+ * 创建包含完整中间状态copy的中间版本 */
 class VersionSet::Builder {
  private:
-  // Helper to sort by v->files_[file_number].smallest
+  // Helper to sort by v->files_[file_number].smallest，比较FileMetaData里的最小key
   struct BySmallestKey {
     const InternalKeyComparator* internal_comparator;
 
@@ -662,6 +680,7 @@ class VersionSet::Builder {
   }
 
   // Apply all of the edits in *edit to the current state.
+  /* 把edit中的所有edit加入到当前 VersionSet::Builder */
   void Apply(VersionEdit* edit) {
     // Update compaction pointers
     for (size_t i = 0; i < edit->compact_pointers_.size(); i++) {
@@ -708,6 +727,7 @@ class VersionSet::Builder {
   }
 
   // Save the current state in *v.
+  /* 将builder中Version的所有files_和added_files按顺序记录到v的files，注意已被删除的file不记录 */
   void SaveTo(Version* v) {
     BySmallestKey cmp;
     cmp.internal_comparator = &vset_->icmp_;
@@ -719,6 +739,8 @@ class VersionSet::Builder {
       std::vector<FileMetaData*>::const_iterator base_end = base_files.end();
       const FileSet* added = levels_[level].added_files;
       v->files_[level].reserve(base_files.size() + added->size());
+      /* added_files 是有序的，files_也是有序的，将added_files插入files_中，如果有file被删除，则不加入；
+       * 加入算法，轮询added_files，每次找出files中小于added_iter的所有元素，写入v，然后把added_iter也写入v，依次循环. */
       for (FileSet::const_iterator added_iter = added->begin();
            added_iter != added->end();
            ++added_iter) {
@@ -756,6 +778,10 @@ class VersionSet::Builder {
     }
   }
 
+  /**
+   * 如果对应level的deleted_files 包含f，则返回，否则加入到version的files_[level]中。
+   *
+   */
   void MaybeAddFile(Version* v, int level, FileMetaData* f) {
     if (levels_[level].deleted_files.count(f->number) > 0) {
       // File is deleted: do nothing
@@ -800,6 +826,9 @@ VersionSet::~VersionSet() {
   delete descriptor_file_;
 }
 
+/**
+ * 把v设为current_，同时加入到dummy_versions的 linked list中
+ */
 void VersionSet::AppendVersion(Version* v) {
   // Make "v" current
   assert(v->refs_ == 0);
@@ -817,6 +846,10 @@ void VersionSet::AppendVersion(Version* v) {
   v->next_->prev_ = v;
 }
 
+/**
+ * 把当前文件信息构建一个新的Version，并写入Manifest文件，同时将新的manifest文件名写入current。
+ *
+ */
 Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   if (edit->has_log_number_) {
     assert(edit->log_number_ >= log_number_);
@@ -876,6 +909,7 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
 
     // If we just created a new descriptor file, install it by writing a
     // new CURRENT file that points to it.
+    // 创建MANIFEST文件成功后，将其文件名写入dbname_/CURRENT文件
     if (s.ok() && !new_manifest_file.empty()) {
       s = SetCurrentFile(env_, dbname_, manifest_file_number_);
     }
@@ -902,6 +936,10 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   return s;
 }
 
+/**
+ * 读取manifest file，找出最适合compaction的level，初始化VersionSet的current等成员；
+ * 如果不能复用已有manifestfile，则将save_manifest设为true，否则不变.
+ */
 Status VersionSet::Recover(bool *save_manifest) {
   struct LogReporter : public log::Reader::Reporter {
     Status* status;
@@ -912,7 +950,7 @@ Status VersionSet::Recover(bool *save_manifest) {
 
   // Read "CURRENT" file, which contains a pointer to the current manifest file
   std::string current;
-  Status s = ReadFileToString(env_, CurrentFileName(dbname_), &current);
+  Status s = ReadFileToString(env_, CurrentFileName(dbname_), &current); // 从CURRENT file中读取manifest file
   if (!s.ok()) {
     return s;
   }
@@ -1007,8 +1045,10 @@ Status VersionSet::Recover(bool *save_manifest) {
 
   if (s.ok()) {
     Version* v = new Version(this);
+    /* 将builder中的所有files、added_files存入到v的files */
     builder.SaveTo(v);
     // Install recovered version
+    /* 找出最适合compaction的level */
     Finalize(v);
     AppendVersion(v);
     manifest_file_number_ = next_file;
@@ -1028,6 +1068,9 @@ Status VersionSet::Recover(bool *save_manifest) {
   return s;
 }
 
+/**
+ * 解析dsbase，如果是Manifest-XX文件，且不超过TargetFileSize(max-file-size),则重复使用该文件，起始位置跳跃过已有的size.
+ */
 bool VersionSet::ReuseManifest(const std::string& dscname,
                                const std::string& dscbase) {
   if (!options_->reuse_logs) {
@@ -1037,7 +1080,7 @@ bool VersionSet::ReuseManifest(const std::string& dscname,
   uint64_t manifest_number;
   uint64_t manifest_size;
   if (!ParseFileName(dscbase, &manifest_number, &manifest_type) ||
-      manifest_type != kDescriptorFile ||
+      manifest_type != kDescriptorFile ||  // kDescriptorFile 意味着dsbase的格式是：MANIFEST-XXX
       !env_->GetFileSize(dscname, &manifest_size).ok() ||
       // Make new compacted MANIFEST if old one is too big
       manifest_size >= TargetFileSize(options_)) {
@@ -1065,6 +1108,11 @@ void VersionSet::MarkFileNumberUsed(uint64_t number) {
   }
 }
 
+/**
+ * 从Version中找出最适合compaction的level。计算公式：
+ * level0： file_size/4;
+ * leveln:  file_bytes/MaxBytesForLevel; (MaxBytesForLevel 大概为O(10^(level-1) M))
+ */
 void VersionSet::Finalize(Version* v) {
   // Precomputed best level for next compaction
   int best_level = -1;
@@ -1133,6 +1181,9 @@ Status VersionSet::WriteSnapshot(log::Writer* log) {
   return log->AddRecord(record);
 }
 
+/**
+ * 返回层级为level的files_数量
+ */
 int VersionSet::NumLevelFiles(int level) const {
   assert(level >= 0);
   assert(level < config::kNumLevels);
@@ -1186,6 +1237,9 @@ uint64_t VersionSet::ApproximateOffsetOf(Version* v, const InternalKey& ikey) {
   return result;
 }
 
+/**
+ * 轮询dummy_versions，将所有files的number插入到live中
+ */
 void VersionSet::AddLiveFiles(std::set<uint64_t>* live) {
   for (Version* v = dummy_versions_.next_;
        v != &dummy_versions_;
@@ -1225,6 +1279,7 @@ int64_t VersionSet::MaxNextLevelOverlappingBytes() {
 // Stores the minimal range that covers all entries in inputs in
 // *smallest, *largest.
 // REQUIRES: inputs is not empty
+/* 获取inputs中所有File的最小最大key */
 void VersionSet::GetRange(const std::vector<FileMetaData*>& inputs,
                           InternalKey* smallest,
                           InternalKey* largest) {
@@ -1259,6 +1314,9 @@ void VersionSet::GetRange2(const std::vector<FileMetaData*>& inputs1,
   GetRange(all, smallest, largest);
 }
 
+/**
+ * 构建InputIterator，对于L-0需要merge所有files，对于L-X，可以直接串联.
+ */
 Iterator* VersionSet::MakeInputIterator(Compaction* c) {
   ReadOptions options;
   options.verify_checksums = options_->paranoid_checks;
@@ -1292,6 +1350,9 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
   return result;
 }
 
+/**
+ * 选择待compaction的files，对于L-0，会包含多个文件，对于其他level，可能会包含多个files.
+ */
 Compaction* VersionSet::PickCompaction() {
   Compaction* c;
   int level;
@@ -1346,6 +1407,9 @@ Compaction* VersionSet::PickCompaction() {
   return c;
 }
 
+/**
+ * 选择level+1的待compaction的files，同时可能会调整level的待compaction的files。
+ */
 void VersionSet::SetupOtherInputs(Compaction* c) {
   const int level = c->level();
   InternalKey smallest, largest;

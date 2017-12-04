@@ -17,6 +17,9 @@
 
 namespace leveldb {
 
+/**
+ * table的一个描述，包含了从Footer解析来的metaindex_handle，以及已经根据index_handle读取出来的index_block
+ */
 struct Table::Rep {
   ~Rep() {
     delete filter;
@@ -35,6 +38,12 @@ struct Table::Rep {
   Block* index_block;
 };
 
+/**
+ * 从file中读取并解析出Footer；
+ * 然后根据Footer读取index_block，根据Footer读取meta，并解析出filter key，然后根据filter key获取filter value，
+ * 进而解析filter value得到filter handle，然后再从file读取filter_data及构建filter.
+ * 此时及打开table。
+ */
 Status Table::Open(const Options& options,
                    RandomAccessFile* file,
                    uint64_t size,
@@ -44,12 +53,14 @@ Status Table::Open(const Options& options,
     return Status::Corruption("file is too short to be an sstable");
   }
 
+  /* 从file中读取footer_space,长度：48 */
   char footer_space[Footer::kEncodedLength];
   Slice footer_input;
   Status s = file->Read(size - Footer::kEncodedLength, Footer::kEncodedLength,
                         &footer_input, footer_space);
   if (!s.ok()) return s;
 
+  /* 从上面读出的字符串中解析出Footer，主要是Footer的2个handle：metaindex_handle和index_handle */
   Footer footer;
   s = footer.DecodeFrom(&footer_input);
   if (!s.ok()) return s;
@@ -61,6 +72,7 @@ Status Table::Open(const Options& options,
     if (options.paranoid_checks) {
       opt.verify_checksums = true;
     }
+    /* 根据footer的index_block读取都应的block 内容到index_block_content */
     s = ReadBlock(file, opt, footer.index_handle(), &index_block_contents);
   }
 
@@ -77,12 +89,17 @@ Status Table::Open(const Options& options,
     rep->filter_data = NULL;
     rep->filter = NULL;
     *table = new Table(rep);
+    /* 根据index_block、file等构建rep_，进一步构建Table；然后进一步读取Footer的metaindex_handle，解析读取构建rep_的filter_data和filter */
     (*table)->ReadMeta(footer);
   }
 
   return s;
 }
 
+/**
+ * 从file中读取meta，如果meta中有filter key(filter.filter_police_name)，则进一步解析filter key 对应的
+ * value，并解析出filter_handle，并根据filter_handle进一步从file中读取filter_data，并构建rep_的filter（FilterBlockReader）
+ */
 void Table::ReadMeta(const Footer& footer) {
   if (rep_->options.filter_policy == NULL) {
     return;  // Do not need any metadata
@@ -94,6 +111,7 @@ void Table::ReadMeta(const Footer& footer) {
   if (rep_->options.paranoid_checks) {
     opt.verify_checksums = true;
   }
+  /* 根据footer.metaindex_handle读取meta contents */
   BlockContents contents;
   if (!ReadBlock(rep_->file, opt, footer.metaindex_handle(), &contents).ok()) {
     // Do not propagate errors since meta info is not needed for operation
@@ -106,12 +124,16 @@ void Table::ReadMeta(const Footer& footer) {
   key.append(rep_->options.filter_policy->Name());
   iter->Seek(key);
   if (iter->Valid() && iter->key() == Slice(key)) {
+    /* 找到key：filter.policy_name后，进一步解析其value，并从file读取构建repl_的filter_data和filter*/
     ReadFilter(iter->value());
   }
   delete iter;
   delete meta;
 }
 
+/**
+ * 根据filter_handle_value 解析并从file读取出 rep_的filter_data，并构建出 其成员 filter（FilterBlockReader）
+ */
 void Table::ReadFilter(const Slice& filter_handle_value) {
   Slice v = filter_handle_value;
   BlockHandle filter_handle;
@@ -125,6 +147,7 @@ void Table::ReadFilter(const Slice& filter_handle_value) {
   if (rep_->options.paranoid_checks) {
     opt.verify_checksums = true;
   }
+  /* 根据从filter_handle_value中解析出来的filter_handle，进一步从file中加载放倒BlockContents block中。 */
   BlockContents block;
   if (!ReadBlock(rep_->file, opt, filter_handle, &block).ok()) {
     return;
@@ -156,6 +179,8 @@ static void ReleaseBlock(void* arg, void* h) {
 
 // Convert an index iterator value (i.e., an encoded BlockHandle)
 // into an iterator over the contents of the corresponding block.
+/* 根据index_value 读取Block，如果有block_cache，且block cache内存在该block，则从cache获取，
+ * 否则从文件获取，同时注册cleaup func */
 Iterator* Table::BlockReader(void* arg,
                              const ReadOptions& options,
                              const Slice& index_value) {
@@ -164,16 +189,19 @@ Iterator* Table::BlockReader(void* arg,
   Block* block = NULL;
   Cache::Handle* cache_handle = NULL;
 
+  /* 从index_value 解析出BlockHandle */
   BlockHandle handle;
   Slice input = index_value;
   Status s = handle.DecodeFrom(&input);
   // We intentionally allow extra stuff in index_value so that we
   // can add more features in the future.
 
+  /* 如果block_cache存在，则从block_cache获取，miss后从file读取后插入block_cache；没有block_cache，
+   * 则直接从file中读取BlockContents，并构建Block */
   if (s.ok()) {
     BlockContents contents;
     if (block_cache != NULL) {
-      char cache_key_buffer[16];
+      char cache_key_buffer[16];  // key format: ${cache_id}${handle.offset}
       EncodeFixed64(cache_key_buffer, table->rep_->cache_id);
       EncodeFixed64(cache_key_buffer+8, handle.offset());
       Slice key(cache_key_buffer, sizeof(cache_key_buffer));
@@ -218,6 +246,10 @@ Iterator* Table::NewIterator(const ReadOptions& options) const {
       &Table::BlockReader, const_cast<Table*>(this), options);
 }
 
+/**
+ * 在rep_->index_block中定位到k后，如果filter确认没有k则返回，否则从block_cache or file
+ * 读取block，再查找k，如果找到调用saver。
+ */
 Status Table::InternalGet(const ReadOptions& options, const Slice& k,
                           void* arg,
                           void (*saver)(void*, const Slice&, const Slice&)) {
@@ -233,6 +265,7 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k,
         !filter->KeyMayMatch(handle.offset(), k)) {
       // Not found
     } else {
+      /* 根据iiter->value解析出BlockHandle，然后从block_cache or file 读出block，构建block的iterator，并注册cleaup func */
       Iterator* block_iter = BlockReader(this, options, iiter->value());
       block_iter->Seek(k);
       if (block_iter->Valid()) {

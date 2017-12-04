@@ -18,6 +18,9 @@
 // non-const method, all threads accessing the same WriteBatch must use
 // external synchronization.
 
+/**
+ * 提供批量更新db的接口
+ */
 #ifndef STORAGE_LEVELDB_INCLUDE_WRITE_BATCH_H_
 #define STORAGE_LEVELDB_INCLUDE_WRITE_BATCH_H_
 
@@ -47,9 +50,11 @@ class LEVELDB_EXPORT WriteBatch {
   //
   // This number is tied to implementation details, and may change across
   // releases. It is intended for LevelDB usage metrics.
+  /* 批处理后对db的size的改变值。 */
   size_t ApproximateSize();
 
   // Support for iterating over the contents of a batch.
+  // 批量contents的迭代处理句柄
   class Handler {
    public:
     virtual ~Handler();

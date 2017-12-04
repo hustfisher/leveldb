@@ -33,6 +33,9 @@ Writer::Writer(WritableFile* dest, uint64_t dest_length)
 Writer::~Writer() {
 }
 
+/**
+ * 循环将slice全部写入log
+ */
 Status Writer::AddRecord(const Slice& slice) {
   const char* ptr = slice.data();
   size_t left = slice.size();
@@ -81,6 +84,9 @@ Status Writer::AddRecord(const Slice& slice) {
   return s;
 }
 
+/**
+ * 构建header，然后写入header、ptr，并进行flush。
+ */
 Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr, size_t n) {
   assert(n <= 0xffff);  // Must fit in two bytes
   assert(block_offset_ + kHeaderSize + n <= kBlockSize);
@@ -101,6 +107,7 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr, size_t n) {
   if (s.ok()) {
     s = dest_->Append(Slice(ptr, n));
     if (s.ok()) {
+      //写完header及ptr，就进行一次flush
       s = dest_->Flush();
     }
   }

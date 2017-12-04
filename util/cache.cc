@@ -335,6 +335,7 @@ void LRUCache::Prune() {
 static const int kNumShardBits = 4;
 static const int kNumShards = 1 << kNumShardBits;
 
+/* 分片LRU cache，产生16个LRUCache，每个LRUCache的容量设为按capacity分片到16份（kNumShards） */
 class ShardedLRUCache : public Cache {
  private:
   LRUCache shard_[kNumShards];
@@ -345,6 +346,7 @@ class ShardedLRUCache : public Cache {
     return Hash(s.data(), s.size(), 0);
   }
 
+  /* 对hash取最高4bit作为分片 */
   static uint32_t Shard(uint32_t hash) {
     return hash >> (32 - kNumShardBits);
   }
@@ -398,6 +400,7 @@ class ShardedLRUCache : public Cache {
 
 }  // end anonymous namespace
 
+/* 创建一个分配LRU cache */
 Cache* NewLRUCache(size_t capacity) {
   return new ShardedLRUCache(capacity);
 }

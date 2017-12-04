@@ -13,6 +13,9 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_TABLE_BUILDER_H_
 #define STORAGE_LEVELDB_INCLUDE_TABLE_BUILDER_H_
 
+/**
+ * 存储table内容的builder。
+ */
 #include <stdint.h>
 #include "leveldb/export.h"
 #include "leveldb/options.h"
@@ -40,6 +43,7 @@ class LEVELDB_EXPORT TableBuilder {
   // passed to the constructor is different from its value in the
   // structure passed to this method, this method will return an error
   // without changing any fields.
+  /* 修改这个table builder的options */
   Status ChangeOptions(const Options& options);
 
   // Add key,value to the table being constructed.
@@ -51,6 +55,7 @@ class LEVELDB_EXPORT TableBuilder {
   // Can be used to ensure that two adjacent entries never live in
   // the same data block.  Most clients should not need to use this method.
   // REQUIRES: Finish(), Abandon() have not been called
+  /* flush 缓冲中的数据到文件 */
   void Flush();
 
   // Return non-ok iff some error has been detected.
@@ -59,6 +64,7 @@ class LEVELDB_EXPORT TableBuilder {
   // Finish building the table.  Stops using the file passed to the
   // constructor after this function returns.
   // REQUIRES: Finish(), Abandon() have not been called
+  /* 结束构建table。这个函数返回后，需要停止使用传给构造函数的file */
   Status Finish();
 
   // Indicate that the contents of this builder should be abandoned.  Stops
@@ -66,6 +72,7 @@ class LEVELDB_EXPORT TableBuilder {
   // If the caller is not going to call Finish(), it must call Abandon()
   // before destroying this builder.
   // REQUIRES: Finish(), Abandon() have not been called
+  /* 指示这个builder的内容会被抛弃。在销毁这个builder前，需要调用Finish or 这个 Abandon */
   void Abandon();
 
   // Number of calls to Add() so far.

@@ -20,6 +20,9 @@ void BlockHandle::EncodeTo(std::string* dst) const {
   PutVarint64(dst, size_);
 }
 
+/**
+ * 从input读取BlockHandle的成员：offset_, size_
+ */
 Status BlockHandle::DecodeFrom(Slice* input) {
   if (GetVarint64(input, &offset_) &&
       GetVarint64(input, &size_)) {
@@ -40,7 +43,14 @@ void Footer::EncodeTo(std::string* dst) const {
   (void)original_size;  // Disable unused variable warning.
 }
 
+/**
+ * 从input解码出Footer，Footer的构成：
+ * metaindex_handle_ +  index_handle_ + 8字节的magic
+ * xxx_handle: offset_, size_，存储类型是vaint，而一个varint最大需要10bytes，
+ * 所以整个Footer的长度： 2 * （10 + 10） + 8 = 48
+ */
 Status Footer::DecodeFrom(Slice* input) {
+  /* 先直接读取magic num并校验 */
   const char* magic_ptr = input->data() + kEncodedLength - 8;
   const uint32_t magic_lo = DecodeFixed32(magic_ptr);
   const uint32_t magic_hi = DecodeFixed32(magic_ptr + 4);
@@ -50,8 +60,10 @@ Status Footer::DecodeFrom(Slice* input) {
     return Status::Corruption("not an sstable (bad magic number)");
   }
 
+  // 从input读取metaindex_handle_ 的 成员：offset_ 和 size_
   Status result = metaindex_handle_.DecodeFrom(input);
   if (result.ok()) {
+    // 从metaindex_handle后面继续读取index_handle的成员：offset，size
     result = index_handle_.DecodeFrom(input);
   }
   if (result.ok()) {
@@ -62,6 +74,13 @@ Status Footer::DecodeFrom(Slice* input) {
   return result;
 }
 
+/**
+ * 根据handle从file中读取block内容，执行顺序：
+ * 1 根据handle从file中读取block的内容，同时会多读取kBlockTrailerSize（5字节）；
+ * 2 如果需要校验，则校验crc；
+ * 3 根据 kBlockTrailerSize 中第一个字节判断是否有压缩，如果有则解压缩后设入result，否则直接设入；
+ * 注意： 如果file->Read 读取，contents没有用buf，则cacheable、heap_allocated为false，否则为true。
+ */
 Status ReadBlock(RandomAccessFile* file,
                  const ReadOptions& options,
                  const BlockHandle& handle,

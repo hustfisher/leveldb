@@ -12,6 +12,9 @@
 // non-const method, all threads accessing the same Iterator must use
 // external synchronization.
 
+/**
+ * 用于迭代数据的接口，可以从DB对象中过的一个迭代器.
+ */
 #ifndef STORAGE_LEVELDB_INCLUDE_ITERATOR_H_
 #define STORAGE_LEVELDB_INCLUDE_ITERATOR_H_
 
@@ -21,6 +24,9 @@
 
 namespace leveldb {
 
+/**
+ * 迭代器，用于定位、迭代读取等，包含一个成员：Cleanup。
+ */
 class LEVELDB_EXPORT Iterator {
  public:
   Iterator();
@@ -28,10 +34,12 @@ class LEVELDB_EXPORT Iterator {
 
   // An iterator is either positioned at a key/value pair, or
   // not valid.  This method returns true iff the iterator is valid.
+  /* 迭代器要么定位在键值对，要么不合法. */
   virtual bool Valid() const = 0;
 
   // Position at the first key in the source.  The iterator is Valid()
   // after this call iff the source is not empty.
+  /* 定位到资源的第一个key，这个函数调用后，迭代器则 valid */
   virtual void SeekToFirst() = 0;
 
   // Position at the last key in the source.  The iterator is
@@ -41,6 +49,7 @@ class LEVELDB_EXPORT Iterator {
   // Position at the first key in the source that is at or past target.
   // The iterator is Valid() after this call iff the source contains
   // an entry that comes at or past target.
+  /* 定位到资源达到或超过目标位的第一个key。只有资源中包含一个源自达到或超过目标位的entry，后面继续调用Valid()返回true */
   virtual void Seek(const Slice& target) = 0;
 
   // Moves to the next entry in the source.  After this call, Valid() is

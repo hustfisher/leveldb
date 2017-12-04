@@ -19,6 +19,9 @@
 
 namespace leveldb {
 
+/**
+ * 用于表示返回值是成功or各种err。
+ */
 class LEVELDB_EXPORT Status {
  public:
   // Create a success status.
@@ -74,7 +77,7 @@ class LEVELDB_EXPORT Status {
  private:
   // OK status has a NULL state_.  Otherwise, state_ is a new[] array
   // of the following form:
-  //    state_[0..3] == length of message
+  //    state_[0..3] == length of message，4个字节，存一个uint32_t 类型的长度：4+len_msg1+len_msg2
   //    state_[4]    == code
   //    state_[5..]  == message
   const char* state_;

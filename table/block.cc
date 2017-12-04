@@ -15,11 +15,17 @@
 
 namespace leveldb {
 
+/**
+ * 获得block中的restarts数量
+ */
 inline uint32_t Block::NumRestarts() const {
   assert(size_ >= sizeof(uint32_t));
   return DecodeFixed32(data_ + size_ - sizeof(uint32_t));
 }
 
+/**
+ * 根据BlockContents初始化Block
+ */
 Block::Block(const BlockContents& contents)
     : data_(contents.data.data()),
       size_(contents.data.size()),

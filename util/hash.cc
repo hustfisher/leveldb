@@ -15,6 +15,9 @@
 
 namespace leveldb {
 
+/**
+ * 计算data的hash，类似murmur算法(murmur3捏？)
+ */
 uint32_t Hash(const char* data, size_t n, uint32_t seed) {
   // Similar to murmur hash
   const uint32_t m = 0xc6a4a793;

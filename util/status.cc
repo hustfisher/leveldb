@@ -20,8 +20,8 @@ Status::Status(Code code, const Slice& msg, const Slice& msg2) {
   assert(code != kOk);
   const uint32_t len1 = msg.size();
   const uint32_t len2 = msg2.size();
-  const uint32_t size = len1 + (len2 ? (2 + len2) : 0);
-  char* result = new char[size + 5];
+  const uint32_t size = len1 + (len2 ? (2 + len2) : 0); // 如果msg2不为null，需要额外2字节存，最终格式："msg: msg2"
+  char* result = new char[size + 5];   //format: size code msg1[: msg2]
   memcpy(result, &size, sizeof(size));
   result[4] = static_cast<char>(code);
   memcpy(result + 5, msg.data(), len1);

@@ -14,6 +14,9 @@
 
 namespace leveldb {
 
+/**
+ * 将iter中的记录写到文件，如果iter记录太多，记录多个文件.
+ */
 Status BuildTable(const std::string& dbname,
                   Env* env,
                   const Options& options,
@@ -24,7 +27,7 @@ Status BuildTable(const std::string& dbname,
   meta->file_size = 0;
   iter->SeekToFirst();
 
-  std::string fname = TableFileName(dbname, meta->number);
+  std::string fname = TableFileName(dbname, meta->number); // name[number].ldb, like mylevel100001.ldb
   if (iter->Valid()) {
     WritableFile* file;
     s = env->NewWritableFile(fname, &file);
@@ -32,6 +35,7 @@ Status BuildTable(const std::string& dbname,
       return s;
     }
 
+    // 将Iterator中的元素全部写入TableBuilder的rep，如果超过block_size则flush到file.，并更新meta的smallest、largest
     TableBuilder* builder = new TableBuilder(options, file);
     meta->smallest.DecodeFrom(iter->key());
     for (; iter->Valid(); iter->Next()) {

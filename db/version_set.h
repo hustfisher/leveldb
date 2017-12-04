@@ -39,6 +39,7 @@ class WritableFile;
 // Return the smallest index i such that files[i]->largest >= key.
 // Return files.size() if there is no such file.
 // REQUIRES: "files" contains a sorted list of non-overlapping files.
+/* 返回满足file[i]->largest >= key的最小index。如果没有这样的file，返回files.size。files包含有序无重叠的文件 */
 extern int FindFile(const InternalKeyComparator& icmp,
                     const std::vector<FileMetaData*>& files,
                     const Slice& key);
@@ -49,6 +50,7 @@ extern int FindFile(const InternalKeyComparator& icmp,
 // largest==NULL represents a key largest than all keys in the DB.
 // REQUIRES: If disjoint_sorted_files, files[] contains disjoint ranges
 //           in sorted order.
+/* 如果files中有文件与给定的smallest、largets key重叠，则返回true */
 extern bool SomeFileOverlapsRange(
     const InternalKeyComparator& icmp,
     bool disjoint_sorted_files,
@@ -56,11 +58,20 @@ extern bool SomeFileOverlapsRange(
     const Slice* smallest_user_key,
     const Slice* largest_user_key);
 
+/**
+ * Version 保存了当前磁盘及内存中的所有的文件信息，一般只有一个Version叫做Current的version。
+ * 同时leveldb还保存了一系列历史版本。这些历史版本有什么作用呢？
+ * 当一个Iterator创建后，Iterator就应用到current version，只要这个Iterator不被delete，那么被Iterator引用
+ * 的version会一直存活（所以Iterator不用时，要立即删除）。
+ * 当一次Compaction结束后（会生成新的文件，合并前的文件需要删除），levelDb会创建一个新的版本作为当前版本，原先的当前版本就会成为历史版本。
+ * Version包含功能：查找key，检测是否需要compaction，查找是否有重叠范围等
+ */
 class Version {
  public:
   // Append to *iters a sequence of iterators that will
   // yield the contents of this Version when merged together.
   // REQUIRES: This version has been saved (see VersionSet::SaveTo)
+  /* 往iters附加一个顺序的迭代器，这些迭代器合并后会产生这个Version的呢人 */
   void AddIterators(const ReadOptions&, std::vector<Iterator*>* iters);
 
   // Lookup the value for key.  If found, store it in *val and
@@ -70,12 +81,14 @@ class Version {
     FileMetaData* seek_file;
     int seek_file_level;
   };
+  /* 查找key对应的value，同时填充GetStats（FileMetaData 和 file_level） */
   Status Get(const ReadOptions&, const LookupKey& key, std::string* val,
              GetStats* stats);
 
   // Adds "stats" into the current state.  Returns true if a new
   // compaction may need to be triggered, false otherwise.
   // REQUIRES: lock is held
+  /* 将stats加入当前的state，如果一个新的compaction需要被触发则返回true，否则返回false */
   bool UpdateStats(const GetStats& stats);
 
   // Record a sample of bytes read at the specified internal key.
@@ -86,6 +99,7 @@ class Version {
 
   // Reference count management (so Versions do not disappear out from
   // under live iterators)
+  /* 引用计数管理，通过Ref、unref，Versions不会从live iterators中消失 */
   void Ref();
   void Unref();
 
@@ -99,12 +113,14 @@ class Version {
   // some part of [*smallest_user_key,*largest_user_key].
   // smallest_user_key==NULL represents a key smaller than all keys in the DB.
   // largest_user_key==NULL represents a key largest than all keys in the DB.
+  /* 如果指定的level与给定的key范围有重叠，则返回true */
   bool OverlapInLevel(int level,
                       const Slice* smallest_user_key,
                       const Slice* largest_user_key);
 
   // Return the level at which we should place a new memtable compaction
   // result that covers the range [smallest_user_key,largest_user_key].
+  /* 返回一个放置新的memtable compaction 结果的level，这个level覆盖指定的key范围 */
   int PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                  const Slice& largest_user_key);
 
@@ -162,6 +178,9 @@ class Version {
   void operator=(const Version&);
 };
 
+/**
+ *  VersionSet 是所有Versions的集合，管理所有存活的Versions。
+ */
 class VersionSet {
  public:
   VersionSet(const std::string& dbname,
@@ -228,12 +247,14 @@ class VersionSet {
   // Returns NULL if there is no compaction to be done.
   // Otherwise returns a pointer to a heap-allocated object that
   // describes the compaction.  Caller should delete the result.
+  /* 为一个新的compaction选择level及input */
   Compaction* PickCompaction();
 
   // Return a compaction object for compacting the range [begin,end] in
   // the specified level.  Returns NULL if there is nothing in that
   // level that overlaps the specified range.  Caller should delete
   // the result.
+  /* 返回一个在某level的compactiong 范围在[begin, end] 的compaction 对象 */
   Compaction* CompactRange(
       int level,
       const InternalKey* begin,
@@ -241,6 +262,7 @@ class VersionSet {
 
   // Return the maximum overlapping data (in bytes) at next level for any
   // file at a level >= 1.
+  /* 返回level大于等于1的下一个level的最大重叠数据（in bytes） */
   int64_t MaxNextLevelOverlappingBytes();
 
   // Create an iterator that reads over the compaction inputs for "*c".
@@ -255,6 +277,7 @@ class VersionSet {
 
   // Add all files listed in any live version to *live.
   // May also mutate some internal state.
+  /* 将所有live version中列出来的文件加入 *live */
   void AddLiveFiles(std::set<uint64_t>* live);
 
   // Return the approximate offset in the database of the data for
@@ -313,6 +336,7 @@ class VersionSet {
 
   // Per-level key at which the next compaction at that level should start.
   // Either an empty string, or a valid InternalKey.
+  /* 下次compaction的起始key，每个level一个 */
   std::string compact_pointer_[config::kNumLevels];
 
   // No copying allowed
@@ -321,6 +345,7 @@ class VersionSet {
 };
 
 // A Compaction encapsulates information about a compaction.
+/* compaction 相关的一些信息 */
 class Compaction {
  public:
   ~Compaction();
@@ -331,6 +356,7 @@ class Compaction {
 
   // Return the object that holds the edits to the descriptor done
   // by this compaction.
+  /* 返回本次compaction完成的一些文件增删描述 edit */
   VersionEdit* edit() { return &edit_; }
 
   // "which" must be either 0 or 1
@@ -344,6 +370,7 @@ class Compaction {
 
   // Is this a trivial compaction that can be implemented by just
   // moving a single input file to the next level (no merging or splitting)
+  /* 这是一个简单compaction吗(可以通过一个移动一个单一文件到下一个level就完成的)? */
   bool IsTrivialMove() const;
 
   // Add all inputs to this compaction as delete operations to *edit.
@@ -352,6 +379,7 @@ class Compaction {
   // Returns true if the information we have available guarantees that
   // the compaction is producing data in "level+1" for which no data exists
   // in levels greater than "level+1".
+  /* 如果为level+1所compaction产生的key不超过level+1的最大值，则返回true */
   bool IsBaseLevelForKey(const Slice& user_key);
 
   // Returns true iff we should stop building the current output

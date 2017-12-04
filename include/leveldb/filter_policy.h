@@ -39,6 +39,8 @@ class LEVELDB_EXPORT FilterPolicy {
   //
   // Warning: do not change the initial contents of *dst.  Instead,
   // append the newly constructed filter to *dst.
+  /* keys[0,n-1) 包含按照用户提供的比较器排序的列表。附加一个filter来归总keys[0,n-1)到dst。
+   * 警告：不要修改dst里的初始内容，而应将新构建的filter附加到dst */
   virtual void CreateFilter(const Slice* keys, int n, std::string* dst)
       const = 0;
 
@@ -47,6 +49,8 @@ class LEVELDB_EXPORT FilterPolicy {
   // the key was in the list of keys passed to CreateFilter().
   // This method may return true or false if the key was not on the
   // list, but it should aim to return false with a high probability.
+  /* filter包含前面CreateFilter调用附加的data（key list）。如果key在list中，返回true。如果不在list中，
+   * 可能返回true or false，但应高概率返回false */
   virtual bool KeyMayMatch(const Slice& key, const Slice& filter) const = 0;
 };
 
@@ -64,6 +68,7 @@ class LEVELDB_EXPORT FilterPolicy {
 // ignores trailing spaces, it would be incorrect to use a
 // FilterPolicy (like NewBloomFilterPolicy) that does not ignore
 // trailing spaces in keys.
+/* 返回一个使用bloom filter的过滤策略，bloom filter对每个key大约指定的bit位。一个推荐值为10，产生1%的误报率 */
 LEVELDB_EXPORT const FilterPolicy* NewBloomFilterPolicy(int bits_per_key);
 }
 

@@ -15,6 +15,7 @@ namespace leveldb {
 extern Status WriteStringToFileSync(Env* env, const Slice& data,
                                     const std::string& fname);
 
+/* 构建的filename 格式： name[number].suffix */
 static std::string MakeFileName(const std::string& name, uint64_t number,
                                 const char* suffix) {
   char buf[100];
@@ -29,6 +30,9 @@ std::string LogFileName(const std::string& name, uint64_t number) {
   return MakeFileName(name, number, "log");
 }
 
+/**
+ * table file name: name[number].ldb, like mylevel100001.ldb
+ */
 std::string TableFileName(const std::string& name, uint64_t number) {
   assert(number > 0);
   return MakeFileName(name, number, "ldb");
@@ -77,6 +81,11 @@ std::string OldInfoLogFileName(const std::string& dbname) {
 //    dbname/LOG.old
 //    dbname/MANIFEST-[0-9]+
 //    dbname/[0-9]+.(log|sst|ldb)
+/*
+ * 从filename解析出type及number，file format 有5种：
+ * 1 dbname/CURRENT; 2 dbname/LOCK; 3 dbname/LOG, dbname/LOG.old;
+ * 4 dbname/MANIFEST-[0-9]+;  5 dbname/[0-9]+.(log|sst|ldb)
+ * */
 bool ParseFileName(const std::string& fname,
                    uint64_t* number,
                    FileType* type) {
@@ -123,6 +132,7 @@ bool ParseFileName(const std::string& fname,
   return true;
 }
 
+/* 构建manifest(内容是：／MANIFEST-descnum)，写入tem file，成功后，将tmp 文件rename成dbname/CURRENT */
 Status SetCurrentFile(Env* env, const std::string& dbname,
                       uint64_t descriptor_number) {
   // Remove leading "dbname/" and add newline to manifest file name

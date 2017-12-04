@@ -89,6 +89,10 @@ Status TableBuilder::ChangeOptions(const Options& options) {
   return Status::OK();
 }
 
+/**
+ * 将pending index endtry计入到index_block;
+ * 将传入的kv加入到Rep的filter_block、data_block，如果data_block的估计size大于阀值(option.block_size)，则进行flush到file.
+ */
 void TableBuilder::Add(const Slice& key, const Slice& value) {
   Rep* r = rep_;
   assert(!r->closed);
@@ -97,12 +101,13 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
   }
 
+  // 如果有pending_index_entry,周到最短key差异部分，将其作为key及offset、size计入index_block
   if (r->pending_index_entry) {
     assert(r->data_block.empty());
     r->options.comparator->FindShortestSeparator(&r->last_key, key);
     std::string handle_encoding;
     r->pending_handle.EncodeTo(&handle_encoding);
-    r->index_block.Add(r->last_key, Slice(handle_encoding));
+    r->index_block.Add(r->last_key, Slice(handle_encoding)); // 把<r->last_key><offset_><size_>计入index_block
     r->pending_index_entry = false;
   }
 
@@ -110,6 +115,7 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     r->filter_block->AddKey(key);
   }
 
+  // 将key value追加到data_block
   r->last_key.assign(key.data(), key.size());
   r->num_entries++;
   r->data_block.Add(key, value);
@@ -120,6 +126,9 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   }
 }
 
+/**
+ * 将data_block写入file，并flush
+ */
 void TableBuilder::Flush() {
   Rep* r = rep_;
   assert(!r->closed);
@@ -136,6 +145,9 @@ void TableBuilder::Flush() {
   }
 }
 
+/**
+ * 将block写入file
+ */
 void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
   // File format contains a sequence of blocks where each block has:
   //    block_data: uint8[n]
@@ -172,6 +184,11 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
   block->Reset();
 }
 
+/**
+ * file block 追加 <BlockHandle><type><CRC>
+ * 1 file 尾部追加 BlockHandle （offset 和 size）；
+ * 2 file 尾部追加 trailer： <typ if kNo/SnapCompression><CRC>
+ */
 void TableBuilder::WriteRawBlock(const Slice& block_contents,
                                  CompressionType type,
                                  BlockHandle* handle) {
@@ -196,6 +213,10 @@ Status TableBuilder::status() const {
   return rep_->status;
 }
 
+/**
+ * 完成结尾记录：<filter_block><metaindex_block><index_block>[footer]
+ * footer: <metaindex_handle><index_handle><magic>
+ */
 Status TableBuilder::Finish() {
   Rep* r = rep_;
   Flush();

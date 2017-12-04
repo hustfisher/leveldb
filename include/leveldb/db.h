@@ -1,6 +1,10 @@
 // Copyright (c) 2011 The LevelDB Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
+/**
+ * db.h: levelDB 的main 接口，所有访问从此处开始。
+ * 参考：http://www.cnblogs.com/haippy/archive/2011/12/04/2276064.html
+ */
 
 #ifndef STORAGE_LEVELDB_INCLUDE_DB_H_
 #define STORAGE_LEVELDB_INCLUDE_DB_H_
@@ -30,7 +34,7 @@ class LEVELDB_EXPORT Snapshot {
   virtual ~Snapshot();
 };
 
-// A range of keys
+// A range of keys， 指向2个字符串常量的指针，其中包括start，不包括limit
 struct LEVELDB_EXPORT Range {
   Slice start;          // Included in the range
   Slice limit;          // Not included in the range
@@ -42,6 +46,9 @@ struct LEVELDB_EXPORT Range {
 // A DB is a persistent ordered map from keys to values.
 // A DB is safe for concurrent access from multiple threads without
 // any external synchronization.
+/**
+ * DB 是一个kv的持久化有序map集合，DB可以在无需额外同步的情况下，被多线程安全访问。
+ */
 class LEVELDB_EXPORT DB {
  public:
   // Open the database with the specified "name".
@@ -72,6 +79,7 @@ class LEVELDB_EXPORT DB {
   // Apply the specified updates to the database.
   // Returns OK on success, non-OK on failure.
   // Note: consider setting options.sync = true.
+  /* 批量更新 */
   virtual Status Write(const WriteOptions& options, WriteBatch* updates) = 0;
 
   // If the database contains an entry for "key" store the
@@ -81,6 +89,7 @@ class LEVELDB_EXPORT DB {
   // a status for which Status::IsNotFound() returns true.
   //
   // May return some other Status on an error.
+  /* 获取key对应的value */
   virtual Status Get(const ReadOptions& options,
                      const Slice& key, std::string* value) = 0;
 
@@ -90,12 +99,15 @@ class LEVELDB_EXPORT DB {
   //
   // Caller should delete the iterator when it is no longer needed.
   // The returned iterator should be deleted before this db is deleted.
+  /* 返回一个在堆上分配的DB内容的迭代器。返回的迭代器最初是无效的，调用者在使用前需要调用其中一个Seek方法 */
   virtual Iterator* NewIterator(const ReadOptions& options) = 0;
 
   // Return a handle to the current DB state.  Iterators created with
   // this handle will all observe a stable snapshot of the current DB
   // state.  The caller must call ReleaseSnapshot(result) when the
   // snapshot is no longer needed.
+  /* 返回当前DB状态的一个句柄。基于此句柄创建的迭代器会得到一个当前DB状态的稳定snapshot。
+   * 当快照不再使用时，需要调用ReleaseSnapshot */
   virtual const Snapshot* GetSnapshot() = 0;
 
   // Release a previously acquired snapshot.  The caller must not
@@ -118,6 +130,7 @@ class LEVELDB_EXPORT DB {
   //     of the sstables that make up the db contents.
   //  "leveldb.approximate-memory-usage" - returns the approximate number of
   //     bytes of memory in use by the DB.
+  /* 获取DB的一些属性值 */
   virtual bool GetProperty(const Slice& property, std::string* value) = 0;
 
   // For each i in [0,n-1], store in "sizes[i]", the approximate
@@ -128,6 +141,8 @@ class LEVELDB_EXPORT DB {
   // sizes will be one-tenth the size of the corresponding user data size.
   //
   // The results may not include the sizes of recently written data.
+  /* 获得在[rang[i].start, range[i].limit)之间的key大概占用的空间，i在[0,n-1)，返回值存在sizes[0,i-1]中。
+   * 注意返回的sizes值只计算文件中占用值，内存由于存在压缩，会占用更多空间 */
   virtual void GetApproximateSizes(const Range* range, int n,
                                    uint64_t* sizes) = 0;
 
@@ -141,6 +156,7 @@ class LEVELDB_EXPORT DB {
   // end==NULL is treated as a key after all keys in the database.
   // Therefore the following call will compact the entire database:
   //    db->CompactRange(NULL, NULL);
+  /* compact key在 begin 和 end之间的所有kv */
   virtual void CompactRange(const Slice* begin, const Slice* end) = 0;
 
  private:

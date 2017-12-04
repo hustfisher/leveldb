@@ -54,7 +54,7 @@ extern char* EncodeVarint64(char* dst, uint64_t value);
 
 // Lower-level versions of Get... that read directly from a character buffer
 // without any bounds checking.
-
+/* 低级版本的get，其直接从字符缓冲中读取，不做任何边界检查 */
 inline uint32_t DecodeFixed32(const char* ptr) {
   if (port::kLittleEndian) {
     // Load the raw bytes
@@ -93,7 +93,7 @@ inline const char* GetVarint32Ptr(const char* p,
     uint32_t result = *(reinterpret_cast<const unsigned char*>(p));
     if ((result & 128) == 0) {
       *value = result;
-      return p + 1;
+      return p + 1; //对于小于128的value，可以快速返回
     }
   }
   return GetVarint32PtrFallback(p, limit, value);

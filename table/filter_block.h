@@ -49,6 +49,9 @@ class FilterBlockBuilder {
   void operator=(const FilterBlockBuilder&);
 };
 
+/**
+ * 带filter的reader
+ */
 class FilterBlockReader {
  public:
  // REQUIRES: "contents" and *policy must stay live while *this is live.

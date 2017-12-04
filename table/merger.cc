@@ -56,6 +56,9 @@ class MergingIterator : public Iterator {
     direction_ = kForward;
   }
 
+  /**
+   * 飞跃到下一个Iterator，然后再次找到最小的key
+   */
   virtual void Next() {
     assert(Valid());
 
@@ -152,6 +155,9 @@ class MergingIterator : public Iterator {
   Direction direction_;
 };
 
+/**
+ * 找到所有IteratorWrapper中的最小的Iterator，并设为current_
+ */
 void MergingIterator::FindSmallest() {
   IteratorWrapper* smallest = NULL;
   for (int i = 0; i < n_; i++) {

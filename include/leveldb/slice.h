@@ -23,6 +23,9 @@
 
 namespace leveldb {
 
+/**
+ * 封装了一个指向 字符型常量(byte array)的指针及size，与普通string相比，不同的是data_字符串不可变，但data_可以指向一个新的字符串常量。
+ */
 class LEVELDB_EXPORT Slice {
  public:
   // Create an empty slice.

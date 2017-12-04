@@ -33,6 +33,9 @@ Reader::~Reader() {
   delete[] backing_store_;
 }
 
+/**
+ * 找到目标block的起始位置偏移量，file跳跃偏移。
+ */
 bool Reader::SkipToInitialBlock() {
   const size_t offset_in_block = initial_offset_ % kBlockSize;
   uint64_t block_start_location = initial_offset_ - offset_in_block;
@@ -56,6 +59,9 @@ bool Reader::SkipToInitialBlock() {
   return true;
 }
 
+/**
+ * 从file中读取block，找出记录
+ */
 bool Reader::ReadRecord(Slice* record, std::string* scratch) {
   if (last_record_offset_ < initial_offset_) {
     if (!SkipToInitialBlock()) {
@@ -191,6 +197,9 @@ void Reader::ReportDrop(uint64_t bytes, const Status& reason) {
   }
 }
 
+/**
+ * 从file中读取32k后，解析出data长度，然后构建result并返回
+ */
 unsigned int Reader::ReadPhysicalRecord(Slice* result) {
   while (true) {
     if (buffer_.size() < kHeaderSize) {

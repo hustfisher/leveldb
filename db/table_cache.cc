@@ -42,25 +42,29 @@ TableCache::~TableCache() {
   delete cache_;
 }
 
+/**
+ * 以file_number作为key，如果TableCache.cache有则返回对应的handle，否则读取file，解析Footer，构建rep_，构建Table，再插入cache。
+ */
 Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
                              Cache::Handle** handle) {
   Status s;
   char buf[sizeof(file_number)];
   EncodeFixed64(buf, file_number);
-  Slice key(buf, sizeof(buf));
+  Slice key(buf, sizeof(buf)); //使用file_number作为key
   *handle = cache_->Lookup(key);
   if (*handle == NULL) {
-    std::string fname = TableFileName(dbname_, file_number);
+    std::string fname = TableFileName(dbname_, file_number); //dbname_[file_number].ldb
     RandomAccessFile* file = NULL;
     Table* table = NULL;
     s = env_->NewRandomAccessFile(fname, &file);
     if (!s.ok()) {
-      std::string old_fname = SSTTableFileName(dbname_, file_number);
+      std::string old_fname = SSTTableFileName(dbname_, file_number); //dbname[file_number].sst
       if (env_->NewRandomAccessFile(old_fname, &file).ok()) {
         s = Status::OK();
       }
     }
     if (s.ok()) {
+      /* 到file中读取并解析Footer，构建Table，初始Table中的rep_ */
       s = Table::Open(*options_, file, file_size, &table);
     }
 
@@ -70,6 +74,7 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
       // We do not cache error results so that if the error is transient,
       // or somebody repairs the file, we recover automatically.
     } else {
+      /* 读取file并解析，获得table，然后将table、file构建出TableAndFile，插入cache */
       TableAndFile* tf = new TableAndFile;
       tf->file = file;
       tf->table = table;
@@ -102,6 +107,10 @@ Iterator* TableCache::NewIterator(const ReadOptions& options,
   return result;
 }
 
+/**
+ * 1 先从TableCache中查找对应的k，如果不存在，则读取file的Footer，解析并构建Table，插入TableCache；
+ * 2 从Table中找到k，则调用saver，否则返回。
+ */
 Status TableCache::Get(const ReadOptions& options,
                        uint64_t file_number,
                        uint64_t file_size,
@@ -109,11 +118,12 @@ Status TableCache::Get(const ReadOptions& options,
                        void* arg,
                        void (*saver)(void*, const Slice&, const Slice&)) {
   Cache::Handle* handle = NULL;
+  /* 从Tablecache.cache中查file_numer 对应的handle，如果没有则读取file构建Footer，并进一步解析读取，构建Table，存入cahce并返回handle */
   Status s = FindTable(file_number, file_size, &handle);
   if (s.ok()) {
     Table* t = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
     s = t->InternalGet(options, k, arg, saver);
-    cache_->Release(handle);
+    cache_->Release(handle); // Cache::handle使用完毕，需要Release
   }
   return s;
 }

@@ -29,6 +29,9 @@ class SequentialFile;
 class Slice;
 class WritableFile;
 
+/**
+ * OS 环境变量的抽象接口。这个接口的posix 实现在util/evn_posix.cc
+ */
 class LEVELDB_EXPORT Env {
  public:
   Env() { }
@@ -39,6 +42,8 @@ class LEVELDB_EXPORT Env {
   // implementation instead of relying on this default environment.
   //
   // The result of Default() belongs to leveldb and must never be deleted.
+  /* 返回适合当前操作系统的默认环境。复杂的用户可能希望提供自己的Env实现，而非依赖这个默认的。
+   * 这个default属于leveldb，不能删除. */
   static Env* Default();
 
   // Create a brand new sequentially-readable file with the specified name.
@@ -48,6 +53,7 @@ class LEVELDB_EXPORT Env {
   // NotFound status when the file does not exist.
   //
   // The returned file will only be accessed by one thread at a time.
+  /* 使用指定的name创建新的顺序可读文件。 */
   virtual Status NewSequentialFile(const std::string& fname,
                                    SequentialFile** result) = 0;
 
@@ -59,6 +65,7 @@ class LEVELDB_EXPORT Env {
   // not exist.
   //
   // The returned file may be concurrently accessed by multiple threads.
+  /* 用指定的name创建一个随机访问的只读文件 */
   virtual Status NewRandomAccessFile(const std::string& fname,
                                      RandomAccessFile** result) = 0;
 
@@ -69,6 +76,7 @@ class LEVELDB_EXPORT Env {
   // returns non-OK.
   //
   // The returned file will only be accessed by one thread at a time.
+  /* 创建一个写入具有指定名字的新文件的对象。删除已存在的同名文件并创建新的. 返回的文件每次只被一个线程访问。 */
   virtual Status NewWritableFile(const std::string& fname,
                                  WritableFile** result) = 0;
 
@@ -84,6 +92,7 @@ class LEVELDB_EXPORT Env {
   // not allow appending to an existing file.  Users of Env (including
   // the leveldb implementation) must be prepared to deal with
   // an Env that does not support appending.
+  /* 创建一个append到已存在的文件对象 or 新文件对象（如果不存在） */
   virtual Status NewAppendableFile(const std::string& fname,
                                    WritableFile** result);
 
@@ -93,6 +102,7 @@ class LEVELDB_EXPORT Env {
   // Store in *result the names of the children of the specified directory.
   // The names are relative to "dir".
   // Original contents of *results are dropped.
+  /* 将dir下的子目录项存入*result */
   virtual Status GetChildren(const std::string& dir,
                              std::vector<std::string>* result) = 0;
 
@@ -126,6 +136,7 @@ class LEVELDB_EXPORT Env {
   // to go away.
   //
   // May create the named file if it does not already exist.
+  /* 锁住指定file。用于组织被多进程访问。如果文件不存在则创建一个新文件. */
   virtual Status LockFile(const std::string& fname, FileLock** lock) = 0;
 
   // Release the lock acquired by a previous successful call to LockFile.
@@ -139,18 +150,21 @@ class LEVELDB_EXPORT Env {
   // added to the same Env may run concurrently in different threads.
   // I.e., the caller may not assume that background work items are
   // serialized.
+  /* 在后台线程安排执行function函数一次。 */
   virtual void Schedule(
       void (*function)(void* arg),
       void* arg) = 0;
 
   // Start a new thread, invoking "function(arg)" within the new thread.
   // When "function(arg)" returns, the thread will be destroyed.
+  /* 启动一个新线程，用于执行function，function返回后，线程需要销毁。 */
   virtual void StartThread(void (*function)(void* arg), void* arg) = 0;
 
   // *path is set to a temporary directory that can be used for testing. It may
   // or many not have just been created. The directory may or may not differ
   // between runs of the same process, but subsequent calls will return the
   // same directory.
+  /* 将*path设为用于测试的临时目录。 */
   virtual Status GetTestDirectory(std::string* path) = 0;
 
   // Create and return a log file for storing informational messages.
@@ -183,6 +197,7 @@ class LEVELDB_EXPORT SequentialFile {
   // If an error was encountered, returns a non-OK status.
   //
   // REQUIRES: External synchronization
+  /* 从file读取最多n个字节到scratch[0...n-1].*result指向scratch[0...n-1] 。需要额外的同步。 */
   virtual Status Read(size_t n, Slice* result, char* scratch) = 0;
 
   // Skip "n" bytes from the file. This is guaranteed to be no
@@ -192,6 +207,7 @@ class LEVELDB_EXPORT SequentialFile {
   // file, and Skip will return OK.
   //
   // REQUIRES: External synchronization
+  /* 从file中条约n个字节。需要额外的同步。 */
   virtual Status Skip(uint64_t n) = 0;
 
  private:
@@ -215,6 +231,7 @@ class LEVELDB_EXPORT RandomAccessFile {
   // status.
   //
   // Safe for concurrent use by multiple threads.
+  /* 从offset读取n个字节到scratch，然后用scratch构建result. */
   virtual Status Read(uint64_t offset, size_t n, Slice* result,
                       char* scratch) const = 0;
 
@@ -227,6 +244,7 @@ class LEVELDB_EXPORT RandomAccessFile {
 // A file abstraction for sequential writing.  The implementation
 // must provide buffering since callers may append small fragments
 // at a time to the file.
+/* 用于顺序写入的文件抽象。实现需要提供缓冲，因为调用者会不断append小字节片段。 */
 class LEVELDB_EXPORT WritableFile {
  public:
   WritableFile() { }

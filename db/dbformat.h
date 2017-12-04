@@ -64,6 +64,7 @@ typedef uint64_t SequenceNumber;
 
 // We leave eight bits empty at the bottom so a type and sequence#
 // can be packed together into 64-bits.
+/* sequence num 预留8bits来存放ValueType */
 static const SequenceNumber kMaxSequenceNumber =
     ((0x1ull << 56) - 1);
 
@@ -110,6 +111,7 @@ inline ValueType ExtractValueType(const Slice& internal_key) {
 
 // A comparator for internal keys that uses a specified comparator for
 // the user key portion and breaks ties by decreasing sequence number.
+/* 内部keys的comparator，用用户的key部分使用指定的comparator，并通过减少序列号来断开  */
 class InternalKeyComparator : public Comparator {
  private:
   const Comparator* user_comparator_;

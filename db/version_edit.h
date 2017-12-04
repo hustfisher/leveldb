@@ -10,10 +10,12 @@
 #include <vector>
 #include "db/dbformat.h"
 
+/* VersionEdit 用于记录整个DB对应的comparator、各个level文件的最大／小 internal key等信息 */
 namespace leveldb {
 
 class VersionSet;
 
+/* 文件元数据 */
 struct FileMetaData {
   int refs;
   int allowed_seeks;          // Seeks allowed until compaction
@@ -25,6 +27,11 @@ struct FileMetaData {
   FileMetaData() : refs(0), allowed_seeks(1 << 30), file_size(0) { }
 };
 
+/**
+ * VersionEdit 表示Version之间的变化，相当于delta增量，表示有增加多少文件，删除了多少文件。
+ * Version0 + VersionEdit => Version1
+ * VersionEdit 会保存到Manifest文件中，当做数据恢复时就会从MANIFEST文件中读取出来重建数据。
+ */
 class VersionEdit {
  public:
   VersionEdit() { Clear(); }
@@ -59,6 +66,7 @@ class VersionEdit {
   // Add the specified file at the specified number.
   // REQUIRES: This version has not been saved (see VersionSet::SaveTo)
   // REQUIRES: "smallest" and "largest" are smallest and largest keys in file
+  /* 构建一个新的file metadata，并将filemetadata加入对应new_files_中 */
   void AddFile(int level, uint64_t file,
                uint64_t file_size,
                const InternalKey& smallest,
@@ -72,6 +80,7 @@ class VersionEdit {
   }
 
   // Delete the specified "file" from the specified "level".
+  /* 从指定的level删除指定的file */
   void DeleteFile(int level, uint64_t file) {
     deleted_files_.insert(std::make_pair(level, file));
   }

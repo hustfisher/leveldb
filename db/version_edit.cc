@@ -11,6 +11,7 @@ namespace leveldb {
 
 // Tag numbers for serialized VersionEdit.  These numbers are written to
 // disk and should not be changed.
+/* 序列号VersionEdit的tag num。 */
 enum Tag {
   kComparator           = 1,
   kLogNumber            = 2,
@@ -38,6 +39,9 @@ void VersionEdit::Clear() {
   new_files_.clear();
 }
 
+/**
+ * 将VersionEdit转换为dst（string）
+ */
 void VersionEdit::EncodeTo(std::string* dst) const {
   if (has_comparator_) {
     PutVarint32(dst, kComparator);
@@ -106,6 +110,9 @@ static bool GetLevel(Slice* input, int* level) {
   }
 }
 
+/**
+ * 从src解析出VersionEdit
+ */
 Status VersionEdit::DecodeFrom(const Slice& src) {
   Clear();
   Slice input = src;
@@ -119,6 +126,7 @@ Status VersionEdit::DecodeFrom(const Slice& src) {
   Slice str;
   InternalKey key;
 
+  /* 循环解析input，根据flag设置VersionEdit里的参数 */
   while (msg == NULL && GetVarint32(&input, &tag)) {
     switch (tag) {
       case kComparator:

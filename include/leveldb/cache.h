@@ -24,6 +24,7 @@
 
 namespace leveldb {
 
+/* LRU cache 相关接口 */
 class LEVELDB_EXPORT Cache;
 
 // Create a new cache with a fixed size capacity.  This implementation
@@ -39,6 +40,7 @@ class LEVELDB_EXPORT Cache {
   virtual ~Cache();
 
   // Opaque handle to an entry stored in the cache.
+  /* 对应于kv entry的不透明handle，由调用房设置 */
   struct Handle { };
 
   // Insert a mapping from key->value into the cache and assign it
@@ -50,6 +52,8 @@ class LEVELDB_EXPORT Cache {
   //
   // When the inserted entry is no longer needed, the key and
   // value will be passed to "deleter".
+  /* 插入一个kv到cache，并分配其权重为charge。返回对应于mapping的句柄。当kv不用时，传给deleter.
+   * 当mapping的句柄handle不在使用时，需要调用this->Relese */
   virtual Handle* Insert(const Slice& key, void* value, size_t charge,
                          void (*deleter)(const Slice& key, void* value)) = 0;
 
@@ -58,28 +62,34 @@ class LEVELDB_EXPORT Cache {
   // Else return a handle that corresponds to the mapping.  The caller
   // must call this->Release(handle) when the returned mapping is no
   // longer needed.
+  /* 返回mapping的handle 如果key存在，否则返回null。当handle不在使用，需要调用Release */
   virtual Handle* Lookup(const Slice& key) = 0;
 
   // Release a mapping returned by a previous Lookup().
   // REQUIRES: handle must not have been released yet.
   // REQUIRES: handle must have been returned by a method on *this.
+  /* Release 通过lookup返回的mapping的handle */
   virtual void Release(Handle* handle) = 0;
 
   // Return the value encapsulated in a handle returned by a
   // successful Lookup().
   // REQUIRES: handle must not have been released yet.
   // REQUIRES: handle must have been returned by a method on *this.
+  /* 返回handle封装的value。hanle需要时lookup返回的  */
   virtual void* Value(Handle* handle) = 0;
 
   // If the cache contains entry for key, erase it.  Note that the
   // underlying entry will be kept around until all existing handles
   // to it have been released.
+  /* 从 cache中erase掉key的entry。entry会一直存在，直到所有返回的该key的entry handles已经被release  */
   virtual void Erase(const Slice& key) = 0;
 
   // Return a new numeric id.  May be used by multiple clients who are
   // sharing the same cache to partition the key space.  Typically the
   // client will allocate a new id at startup and prepend the id to
   // its cache keys.
+  /* 返回一个数字ID，可由共享相同cache的多个client使用来区分key space。通常情况下，
+   * client在启动时分配一个新的id，并将该id prepend到它的cache keys。 */
   virtual uint64_t NewId() = 0;
 
   // Remove all cache entries that are not actively in use.  Memory-constrained
@@ -87,10 +97,12 @@ class LEVELDB_EXPORT Cache {
   // Default implementation of Prune() does nothing.  Subclasses are strongly
   // encouraged to override the default implementation.  A future release of
   // leveldb may change Prune() to a pure abstract method.
+  /* 删除所有没有被使用的缓冲条目。 */
   virtual void Prune() {}
 
   // Return an estimate of the combined charges of all elements stored in the
   // cache.
+  /* 返回缓存中所有元素的组合charge的估计值 */
   virtual size_t TotalCharge() const = 0;
 
  private:

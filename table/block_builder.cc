@@ -70,6 +70,9 @@ Slice BlockBuilder::Finish() {
   return Slice(buffer_);
 }
 
+/**
+ * 将k-v追加到buffer_，格式：<shared_size><non_shared_size><value_size><non_shared_chars><value>
+ */
 void BlockBuilder::Add(const Slice& key, const Slice& value) {
   Slice last_key_piece(last_key_);
   assert(!finished_);
@@ -99,7 +102,7 @@ void BlockBuilder::Add(const Slice& key, const Slice& value) {
   buffer_.append(key.data() + shared, non_shared);
   buffer_.append(value.data(), value.size());
 
-  // Update state
+  // Update state 把last_key_改为key
   last_key_.resize(shared);
   last_key_.append(key.data() + shared, non_shared);
   assert(Slice(last_key_) == key);

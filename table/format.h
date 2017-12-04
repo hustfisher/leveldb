@@ -19,6 +19,8 @@ struct ReadOptions;
 
 // BlockHandle is a pointer to the extent of a file that stores a data
 // block or a meta block.
+/* BlockHandle 是一个指向存储了data block 或 meta block的文件的范围。
+ * 包含2个成员：offset_, size_ */
 class BlockHandle {
  public:
   BlockHandle();
@@ -44,6 +46,7 @@ class BlockHandle {
 
 // Footer encapsulates the fixed information stored at the tail
 // end of every table file.
+/* footer 存放在每个table file的结尾，用于封装固定的信息 */
 class Footer {
  public:
   Footer() { }
@@ -66,6 +69,11 @@ class Footer {
   // Encoded length of a Footer.  Note that the serialization of a
   // Footer will always occupy exactly this many bytes.  It consists
   // of two block handles and a magic number.
+  /* 编码的Footer长度，其包含2个BlockHandle 和一个magic num，共48字节
+   * 注：BlockHandle包含offset、size两个varint，每个varint最大存储10bytes，
+   * 所以对每个BlockHandle的最大存储空间是： 10 + 10 = 20bytes,
+   * 整个Footer是： 2 * 20 + 8 = 48
+   * */
   enum {
     kEncodedLength = 2*BlockHandle::kMaxEncodedLength + 8
   };
@@ -81,6 +89,7 @@ class Footer {
 static const uint64_t kTableMagicNumber = 0xdb4775248b80fb57ull;
 
 // 1-byte type + 32-bit crc
+/* 1 byte：存放的值为：kNoCompression or kSnappyCompression; 32-bit crc: checksum */
 static const size_t kBlockTrailerSize = 5;
 
 struct BlockContents {

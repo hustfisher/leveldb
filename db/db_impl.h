@@ -45,9 +45,11 @@ class DBImpl : public DB {
   // Extra methods (for testing) that are not in the public DB interface
 
   // Compact any files in the named level that overlap [*begin,*end]
+  /* 为测试准备的额外方法：compact 某level的[*begin, *end]的kv */
   void TEST_CompactRange(int level, const Slice* begin, const Slice* end);
 
   // Force current memtable contents to be compacted.
+  /* 强制compact当前的memtable的内容 */
   Status TEST_CompactMemTable();
 
   // Return an internal iterator over the current state of the database.
@@ -57,6 +59,7 @@ class DBImpl : public DB {
 
   // Return the maximum overlapping data (in bytes) at next level for any
   // file at a level >= 1.
+  /* 返回level大于等于1的level中最大重叠数据 */
   int64_t TEST_MaxNextLevelOverlappingBytes();
 
   // Record a sample of bytes read at the specified internal key.
@@ -78,6 +81,7 @@ class DBImpl : public DB {
   // Recover the descriptor from persistent storage.  May do a significant
   // amount of work to recover recently logged updates.  Any changes to
   // be made to the descriptor are added to *edit.
+  /* 恢复持久存储中的描述 */
   Status Recover(VersionEdit* edit, bool* save_manifest)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
@@ -153,6 +157,7 @@ class DBImpl : public DB {
 
   // Set of table files to protect from deletion because they are
   // part of ongoing compactions.
+  // 保存会被不断compaction的file nums，避免被删除
   std::set<uint64_t> pending_outputs_;
 
   // Has a background compaction been scheduled or is running?

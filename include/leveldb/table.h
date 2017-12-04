@@ -22,6 +22,7 @@ class TableCache;
 // A Table is a sorted map from strings to strings.  Tables are
 // immutable and persistent.  A Table may be safely accessed from
 // multiple threads without external synchronization.
+/* table 是一个string到string的有序map。table是不可变及持久化的。table可以被多线程安全访问，而无需额外同步。 */
 class LEVELDB_EXPORT Table {
  public:
   // Attempt to open the table that is stored in bytes [0..file_size)
@@ -36,6 +37,7 @@ class LEVELDB_EXPORT Table {
   // for the duration of the returned table's lifetime.
   //
   // *file must remain live while this Table is in use.
+  /* 尝试打开保存了file——size个字节file的table，并读取从table中获取数据所需要的元数据。 */
   static Status Open(const Options& options,
                      RandomAccessFile* file,
                      uint64_t file_size,
@@ -66,6 +68,7 @@ class LEVELDB_EXPORT Table {
   // Calls (*handle_result)(arg, ...) with the entry found after a call
   // to Seek(key).  May not make such a call if filter policy says
   // that key is not present.
+  /* Seek(key)后，调用handle_result。如果key不存在可能不会触发调用 */
   friend class TableCache;
   Status InternalGet(
       const ReadOptions&, const Slice& key,

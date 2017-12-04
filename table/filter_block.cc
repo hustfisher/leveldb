@@ -33,6 +33,9 @@ void FilterBlockBuilder::AddKey(const Slice& key) {
   keys_.append(k.data(), k.size());
 }
 
+/**
+ * 构建filter block
+ */
 Slice FilterBlockBuilder::Finish() {
   if (!start_.empty()) {
     GenerateFilter();
@@ -75,6 +78,9 @@ void FilterBlockBuilder::GenerateFilter() {
   start_.clear();
 }
 
+/**
+ * 根据policy 和 contents 初始化FilterBlockReader
+ */
 FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
                                      const Slice& contents)
     : policy_(policy),

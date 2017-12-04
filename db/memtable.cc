@@ -79,6 +79,10 @@ Iterator* MemTable::NewIterator() {
   return new MemTableIterator(&table_);
 }
 
+/**
+ * memtable（封装的skiplit）的add操作：
+ * 将key、value按[key_size][key][sequenceNum<<8|type][value_size][value]的顺序构建成一个字串，然后插入到table_(一个skiplist).
+ */
 void MemTable::Add(SequenceNumber s, ValueType type,
                    const Slice& key,
                    const Slice& value) {
@@ -105,6 +109,9 @@ void MemTable::Add(SequenceNumber s, ValueType type,
   table_.Insert(buf);
 }
 
+/**
+ * 从memtable中找key，如果找到，对比tag，如果tag是kTypevalue则返回true并将v设到value，如果是kTypeDeletion则设s为notFound，返回true。
+ */
 bool MemTable::Get(const LookupKey& key, std::string* value, Status* s) {
   Slice memkey = key.memtable_key();
   Table::Iterator iter(&table_);

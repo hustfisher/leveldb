@@ -23,6 +23,9 @@ Iterator::~Iterator() {
   }
 }
 
+/**
+ * 往Iterator中注册cleanup的function，用单链表保存
+ */
 void Iterator::RegisterCleanup(CleanupFunction func, void* arg1, void* arg2) {
   assert(func != NULL);
   Cleanup* c;

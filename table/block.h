@@ -14,6 +14,9 @@ namespace leveldb {
 struct BlockContents;
 class Comparator;
 
+/**
+ * block 数据块，主要操作是获取size 及新建一个访问迭代器 NewIterator
+ */
 class Block {
  public:
   // Initialize the block with the specified contents.
@@ -30,7 +33,7 @@ class Block {
   const char* data_;
   size_t size_;
   uint32_t restart_offset_;     // Offset in data_ of restart array
-  bool owned_;                  // Block owns data_[]
+  bool owned_;                  // Block owns data_[]，即：block_contents.heap_allocated, block_content中的内容是否存在由外部传入的buf。
 
   // No copying allowed
   Block(const Block&);
